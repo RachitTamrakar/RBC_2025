@@ -18,10 +18,10 @@ SoftwareSerial btSerial(BT_RX_PIN, BT_TX_PIN); // RX, TX (only used before Dabbl
 // ---------------- Motor Pin Configuration ----------------
 // Adjust according to your motor driver (e.g., L298N / L293D)
 // Two DC motors: Left (A), Right (B)
-const uint8_t IN1 = 4;   // Left motor forward (PWM capable)
-const uint8_t IN2 = 5;   // Left motor backward (PWM capable)
-const uint8_t IN3 = 6;   // Right motor forward (PWM capable)
-const uint8_t IN4 = 7;   // Right motor backward (PWM capable)
+const uint8_t IN1 = 5;   // Left motor forward (PWM capable)
+const uint8_t IN2 = 6;   // Left motor backward (PWM capable)
+const uint8_t IN3 = 9;   // Right motor forward (PWM capable)
+const uint8_t IN4 = 10;   // Right motor backward (PWM capable)
 
 uint8_t speedPct = 70;   // Default speed percentage (0-100)
 
@@ -52,24 +52,6 @@ void turnLeft() {
 void turnRight() {
   analogWrite(IN1, pwmFromPct(speedPct)); analogWrite(IN2, 0);
   analogWrite(IN3, 0); analogWrite(IN4, pwmFromPct(speedPct/2));
-}
-
-void setSpeedDigit(char c) {
-  if (c >= '0' && c <= '9') {
-    // Map 0 -> 0%, 9 -> 100%
-    speedPct = (c - '0') * 100 / 9;
-  }
-}
-
-void handleCommandChar(char c) {
-  switch (c) {
-    case 'F': driveForward(); break;
-    case 'B': driveBackward(); break;
-    case 'L': turnLeft(); break;
-    case 'R': turnRight(); break;
-    case 'S': stopMotors(); break;
-    default: setSpeedDigit(c); break; // digits adjust speed
-  }
 }
 
 void setupPins() {
@@ -117,8 +99,8 @@ void loopBLE() {
     // Simple differential drive from joystick
     int forward = joyY; // -7..7
     int turn = joyX;    // -7..7
-    int left = forward - turn;
-    int right = forward + turn;
+    int left = forward - turn / 2;
+    int right = forward + turn / 2;
     auto clamp = [](int v){ if (v>7) v=7; if (v<-7) v=-7; return v; };
     left = clamp(left); right = clamp(right);
     int base = 255; // max PWM
@@ -127,6 +109,9 @@ void loopBLE() {
     // Apply to motors
     if (lPWM >=0) { analogWrite(IN1, lPWM); analogWrite(IN2,0);} else { analogWrite(IN1,0); analogWrite(IN2,-lPWM);} 
     if (rPWM >=0) { analogWrite(IN3, rPWM); analogWrite(IN4,0);} else { analogWrite(IN3,0); analogWrite(IN4,-rPWM);} 
+  } else if (!moved && joyX == 0 && joyY == 0) {
+    // Joystick released: ensure we stop (dead-man style)
+    stopMotors();
   }
   if (millis() - lastStatusMs > 3000) {
     lastStatusMs = millis();
